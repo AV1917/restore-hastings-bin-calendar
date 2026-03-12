@@ -1,6 +1,6 @@
 # Restore Hastings Bin Calendar
 
-Hastings Borough Council used to provide a downloadable PDF schedule. Unfortunately, according to comments on their Facebook page, they removed it for 2026 for 'accessibility reasons' and claims that 'it wasn't downloaded often enough.'
+Hastings Borough Council used to provide a downloadable PDF schedule of their bin collections. Unfortunately, according to comments on their Facebook page, they removed it for 2026 for 'accessibility reasons' and claims that 'it wasn't downloaded often enough.'
 
 This userscript puts the **Download your full collection calendar as a PDF** button back onto the Hastings Borough Council collection lookup page, right where it used to be and exactly how it used to look – and it downloads an automatically-generated PDF schedule bespoke to your collection days and types.
 
