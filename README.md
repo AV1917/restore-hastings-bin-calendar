@@ -45,13 +45,13 @@ After you run an address lookup on the Hastings collection lookup page, the scri
 - Shows Christmas / New Year exceptions at the top
 
 ## How it works
-Very roughly, the script combines three things:
+Very roughly, this script combines three things:
 
 - The live lookup data from the page
 - The full Hastings calendar page for your schedule
 - The Hastings Christmas / New Year collections page
 
-If garden waste or food waste dates are incomplete, it can extend the pattern from the real dates it already has. Real website dates always take priority over guessed ones.
+If garden waste or food waste dates are incomplete, it can extend the pattern from the real dates it already has. Real website dates always take priority over extrapolated ones.
 
 Over the Christmas period, if no real data is available, food waste and garden waste are omitted to ensure that calendar dates are as accurate as possible.
 
