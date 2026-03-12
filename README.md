@@ -8,7 +8,7 @@ This userscript puts the **Download your full collection calendar as a PDF** lin
 - Includes holiday exceptions and cancellations (where available)
 - Built in true A4 to make better use of the available space
 
-## Install in Tampermonkey
+## Install & use
 1. Install [Tampermonkey](https://www.tampermonkey.net/) in your browser.
 2. Open the raw userscript file: https://github.com/AV1917/restore-hastings-bin-calendar/raw/main/restore-hastings-bin-calendar.user.js
 3. Tampermonkey should open an install screen automatically.
