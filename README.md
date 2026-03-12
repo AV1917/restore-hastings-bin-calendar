@@ -2,20 +2,26 @@
 
 Hastings Borough Council used to provide a downloadable PDF schedule. Unfortunately, according to comments on their Facebook page, they removed it for 2026 for 'accessibility reasons' and claims that 'it wasn't downloaded often enough.'
 
-This userscript puts the **Download your full collection calendar as a PDF** link back onto the Hastings Borough Council waste lookup page, right where it used to be and exactly how it used to look. Likewise, all efforts have been taken to make the PDF look as much like the original PDF provided by the council as possible – but not without some improvements:
+This userscript puts the **Download your full collection calendar as a PDF** button back onto the Hastings Borough Council collection lookup page, right where it used to be and exactly how it used to look – and it downloads an automatically-generated PDF schedule bespoke to your collection days and types.
+
+All efforts have been taken to make the PDF look as much like the original PDF provided by the council as possible – but not without some improvements:
 
 - Shows garden waste and food waste too – not just rubbish and recycling
 - Includes holiday exceptions and cancellations (where available)
 - Built in true A4 to make better use of the available space
 
-## Install & use
+## Installation
 1. Install [Tampermonkey](https://www.tampermonkey.net/) in your browser
 2. Open the raw userscript file: https://github.com/AV1917/restore-hastings-bin-calendar/raw/main/restore-hastings-bin-calendar.user.js
 3. Tampermonkey should open an install screen automatically
 4. Click **Install**
-5. Go to: https://www.hastings.gov.uk/waste_recycling/lookup/
-6. Run your normal address lookup
-7. Click **Download your full collection calendar as a PDF**
+
+## How to use it
+1. Go to: https://www.hastings.gov.uk/waste_recycling/lookup/
+2. Run your normal address lookup
+3. Click **Download your full collection calendar as a PDF**
+
+![Original weekly calendar](docs/button_location.png)
 
 ## Comparisons
 ### Weekly
