@@ -4,7 +4,7 @@
 // @homepage     https://github.com/AV1917
 // @version      1.0.0
 // @description  Recreates the PDF download link for the selected bin collection calendar and puts it back where it belongs on the Hastings Borough Council webpage.
-// @icon         https://github.com/AV1917/restore-hastings-bin-calendar/blob/main/docs/RHBC.png
+// @icon         https://github.com/AV1917/restore-hastings-bin-calendar/raw/main/docs/RHBC.png
 // @author       AV1917
 // @match        https://www.hastings.gov.uk/waste_recycling/lookup/*
 // @require      https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js
