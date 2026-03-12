@@ -9,13 +9,13 @@ This userscript puts the **Download your full collection calendar as a PDF** lin
 - Built in true A4 to make better use of the available space
 
 ## Install & use
-1. Install [Tampermonkey](https://www.tampermonkey.net/) in your browser.
+1. Install [Tampermonkey](https://www.tampermonkey.net/) in your browser
 2. Open the raw userscript file: https://github.com/AV1917/restore-hastings-bin-calendar/raw/main/restore-hastings-bin-calendar.user.js
-3. Tampermonkey should open an install screen automatically.
-4. Click **Install**.
+3. Tampermonkey should open an install screen automatically
+4. Click **Install**
 5. Go to: https://www.hastings.gov.uk/waste_recycling/lookup/
-6. Run your normal address lookup.
-7. Click **Download your full collection calendar as a PDF**.
+6. Run your normal address lookup
+7. Click **Download your full collection calendar as a PDF**
 
 ## Comparisons
 ### Weekly
