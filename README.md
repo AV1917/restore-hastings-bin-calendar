@@ -10,10 +10,10 @@ This userscript puts the **Download your full collection calendar as a PDF** lin
 
 ## Install in Tampermonkey
 1. Install [Tampermonkey](https://www.tampermonkey.net/) in your browser.
-2. Open the raw userscript file: `https://github.com/AV1917/restore-hastings-bin-calendar/raw/main/restore-hastings-bin-calendar.user.js`
+2. Open the raw userscript file: https://github.com/AV1917/restore-hastings-bin-calendar/raw/main/restore-hastings-bin-calendar.user.js
 3. Tampermonkey should open an install screen automatically.
 4. Click **Install**.
-5. Go to: `https://www.hastings.gov.uk/waste_recycling/lookup/`
+5. Go to: https://www.hastings.gov.uk/waste_recycling/lookup/
 6. Run your normal address lookup.
 7. Click **Download your full collection calendar as a PDF**.
 
@@ -29,7 +29,7 @@ This userscript puts the **Download your full collection calendar as a PDF** lin
 | ![Original fortnightly calendar](docs/original/RecTueFort1RefTueFort2.png) | ![New fortnightly calendar](docs/new/RecTueFort1RefTueFort2-2026.png) |
 
 ## What it does
-After you run an address lookup on the Hastings waste page, the script:
+After you run an address lookup on the Hastings collection lookup page, the script:
 - Grabs the collection data already loaded on the page
 - Works out your schedule
 - Pulls in the matching Hastings calendar page
