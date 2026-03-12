@@ -32,7 +32,7 @@ All efforts have been taken to make the PDF look as much like the original PDF p
 
 ### Fortnightly
 | [Original](docs/original/RecTueFort1RefTueFort2.pdf) | [New](docs/new/RecTueFort1RefTueFort2-2026.pdf) |
-| --- | --- |
+| :--- | :--- |
 | ![Original fortnightly calendar](docs/original/RecTueFort1RefTueFort2.png) | ![New fortnightly calendar](docs/new/RecTueFort1RefTueFort2-2026.png) |
 
 ## What it does
