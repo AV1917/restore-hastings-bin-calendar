@@ -18,7 +18,7 @@ All efforts have been taken to make the PDF look as much like the original PDF p
 
 ## How to use it
 1. Go to: https://www.hastings.gov.uk/waste_recycling/lookup/
-2. Make sure Tampermonkey is running with the script enabled - you should see a red (1) badge on the icon.
+2. Make sure Tampermonkey is running with the script enabled - you should see a red (1) badge on the icon
 2. Run your normal address lookup
 3. Click **Download your full collection calendar as a PDF**
 
