@@ -46,7 +46,6 @@
   };
 
   patchXHR();
-  seedFromExistingLink();
 
   function patchXHR() {
     const proto = XMLHttpRequest.prototype;
@@ -62,76 +61,56 @@
       const url = String(this.__hbcUrl || "").toLowerCase();
       if (url.includes(LOOKUP_ENDPOINT.toLowerCase())) {
         this.addEventListener("load", () => {
-          try {
-            const payload = JSON.parse(this.responseText || "{}");
-            const lookup = normaliseLookup(payload);
-            if (lookup && lookup.scheduleCode) {
-              state.lookup = lookup;
-              upsertButton();
-            }
-          } catch (error) {
-            console.log("[HBC PDF] lookup parse failed: ", error);
-          }
+          const payload = JSON.parse(this.responseText);
+          const lookup = normaliseLookup(payload);
+          state.lookup = lookup;
+          upsertButton();
         });
       }
       return send.apply(this, arguments);
     };
   }
 
-  function seedFromExistingLink() {
-    const href = document.querySelector("#calendarLink")?.getAttribute("href") || "";
-    const m = href.match(/\/calendars2024\/([^/]+)\/?/i);
-    if (!m) return;
-    state.lookup = {
-      scheduleCode: m[1],
-      recycling: null,
-      rubbish: null,
-      garden: null,
-      food: null
-    };
-    upsertButton();
-  }
-
   function normaliseLookup(payload) {
     const rows = Array.isArray(payload?.d) ? payload.d : null;
-    if (!rows || !rows.length) return null;
-    const services = rows.map((r, idx) => {
-      const service = String(r?.Service || "");
-      const lower = service.toLowerCase();
-      let kind = "other";
-      if (lower.includes("garden")) kind = "garden";
-      else if (lower.includes("food")) kind = "food";
-      else if (lower.includes("recycling")) kind = "recycling";
-      else if (/\brubbish\b|\brefuse\b|domestic\s+waste/.test(lower)) kind = "rubbish";
+    if (!rows || !rows.length) throw new Error("No services.");
+    const services = rows.map((r) => {
+      const service = String(r?.Service || "").trim();
+      const kind = classifyServiceKind(service);
+      if (!kind) return null;
       return {
-        key: makeServiceKey(service, r?.Id, idx),
         kind,
         service,
-        schedule: String(r?.Schedule || ""),
-        image: String(r?.Image || ""),
-        dates: parseAspDates(r?.Dates)
+        schedule: String(r?.Schedule ?? "").trim(),
+        image: String(r?.Image ?? "").trim(),
+        dates: normaliseDateItems(r?.Dates)
       };
-    }).filter((s) => s.kind !== "other");
+    }).filter(Boolean);
     const recycling = services.find((s) => s.kind === "recycling") || null;
     const rubbish = services.find((s) => s.kind === "rubbish") || null;
+    if (!recycling || !rubbish) throw new Error("Missing core services.");
     const garden = services.find((s) => s.kind === "garden") || null;
     const food = services.find((s) => s.kind === "food") || null;
     const scheduleCode = composeScheduleCode(recycling, rubbish);
     return { services, recycling, rubbish, garden, food, scheduleCode };
   }
 
-  function parseAspDates(values) {
-    return normaliseDateItems(values);
+  function classifyServiceKind(serviceName) {
+    const lower = serviceName.toLowerCase();
+    if (lower.includes("garden")) return "garden";
+    if (lower.includes("food")) return "food";
+    if (lower.includes("recycling")) return "recycling";
+    if (lower.includes("rubbish")) return "rubbish";
+    return null;
   }
 
   function composeScheduleCode(recycling, rubbish) {
-    const rec = recycling?.schedule || "";
-    const ref = rubbish?.schedule || "";
+    const rec = String(recycling?.schedule || "").trim();
+    const ref = String(rubbish?.schedule || "").trim();
+    if (!rec || !ref) throw new Error("Missing schedule code.");
     if (/^rec/i.test(rec) && /^ref/i.test(ref)) return rec + ref;
     if (/^ref/i.test(rec) && /^rec/i.test(ref)) return ref + rec;
-    const href = document.querySelector("#calendarLink")?.getAttribute("href") || "";
-    const m = href.match(/\/calendars2024\/([^/]+)\/?/i);
-    return m ? m[1] : null;
+    throw new Error("Unsupported schedule pair.");
   }
 
   function upsertButton() {
@@ -197,7 +176,6 @@
       attachGarden(months, estimateGardenDates(gardenSeed, cal.year, cal.isWeekly));
       const gardenRule = await getGardenSuspensionRule();
       attachFood(months, estimateFoodDates(foodSeed, cal.year, foodLookupSeed, gardenRule));
-      attachExtraServices(months, lookup.services || []);
       await markCancelledGardenCollections(months, gardenRule);
       pruneEmptyLeadMonth(months, cal.isWeekly);
       const icons = await loadIcons(lookup);
@@ -268,7 +246,9 @@
       const type = inferType(row, isWeekly);
       for (const raw of dates) {
         const p = parseDate(norm(raw));
-        if (!p) continue;
+        if (!p) {
+          throw new Error('Could not parse calendar date "' + norm(raw) + '".');
+        }
         entries.push({ type, date: p, bold: strong.has(norm(raw)) });
       }
     }
@@ -293,8 +273,8 @@
     if (text.includes("food") || text.includes("fw-") || text.includes("caddy")) return "food";
     if (isWeekly) return "both";
     if (text.includes("dr-sack") || text.includes("recycling")) return "recycling";
-    if (text.includes("dw-sack") || text.includes("rubbish") || text.includes("waste")) return "rubbish";
-    return "both";
+    if (text.includes("dw-sack") || text.includes("rubbish")) return "rubbish";
+    throw new Error('Could not infer fortnightly collection type from row text: "' + text.slice(0, 160) + '".');
   }
 
   function groupWeekly(entries) {
@@ -345,10 +325,7 @@
       else if (e.type === "rubbish") map.get(k).rubbish.push(item);
       else if (e.type === "garden") map.get(k).garden.push(item);
       else if (e.type === "food") map.get(k).food.push(item);
-      else {
-        map.get(k).recycling.push(item);
-        map.get(k).rubbish.push(item);
-      }
+      else continue;
     }
     return Array.from(map.values()).map((m) => ({
       start: m.start,
@@ -373,8 +350,7 @@
         label: monthName(11) + " " + (year - 1),
         dates: lead ? (lead.dates || []) : [],
         garden: lead ? (lead.garden || []) : [],
-        food: lead ? (lead.food || []) : [],
-        extraPanels: []
+        food: lead ? (lead.food || []) : []
       });
     } else {
       out.push({
@@ -384,8 +360,7 @@
         recycling: lead ? (lead.recycling || []) : [],
         rubbish: lead ? (lead.rubbish || []) : [],
         garden: lead ? (lead.garden || []) : [],
-        food: lead ? (lead.food || []) : [],
-        extraPanels: []
+        food: lead ? (lead.food || []) : []
       });
     }
 
@@ -398,8 +373,7 @@
           label: monthName(i) + " " + year,
           dates: src ? src.dates : [],
           garden: src ? src.garden : [],
-          food: src ? src.food : [],
-          extraPanels: []
+          food: src ? src.food : []
         });
       } else {
         out.push({
@@ -409,8 +383,7 @@
           recycling: src ? src.recycling : [],
           rubbish: src ? src.rubbish : [],
           garden: src ? src.garden : [],
-          food: src ? src.food : [],
-          extraPanels: []
+          food: src ? src.food : []
         });
       }
     }
@@ -554,10 +527,6 @@
     for (const m of months) m.food = dedupeSortItems(m.food || []);
   }
 
-  function attachExtraServices(months, services) {
-    for (const m of months) m.extraPanels = [];
-  }
-
   function collectServiceItems(months, key) {
     if (!Array.isArray(months)) return [];
     return months.flatMap((month) => Array.isArray(month?.[key]) ? month[key] : []);
@@ -581,8 +550,7 @@
         (Array.isArray(lead.rubbish) && lead.rubbish.length > 0);
     const hasExtras =
       (Array.isArray(lead.garden) && lead.garden.length > 0) ||
-      (Array.isArray(lead.food) && lead.food.length > 0) ||
-      (Array.isArray(lead.extraPanels) && lead.extraPanels.length > 0);
+      (Array.isArray(lead.food) && lead.food.length > 0);
     if (!hasCore && !hasExtras) months.shift();
   }
 
@@ -735,28 +703,30 @@
   }
 
   async function loadIcons(lookup) {
-    const rec = await toDataUrl(resolveIconUrl(lookup?.recycling?.image, "dr-sack.png"));
-    const rub = await toDataUrl(resolveIconUrl(lookup?.rubbish?.image, "dw-sack.png"));
-    const gar = await toDataUrl(resolveIconUrl(lookup?.garden?.image, "gw-240.png"));
-    const food = await toDataUrl(resolveIconUrl(lookup?.food?.image, "dr-sack.png"));
-    const extras = {};
-    return { recycling: rec, rubbish: rub, garden: gar, food, extras };
+    const rec = await toDataUrl(resolveIconUrl(lookup?.recycling?.image));
+    const rub = await toDataUrl(resolveIconUrl(lookup?.rubbish?.image));
+    const gar = lookup?.garden
+      ? await toDataUrl(resolveIconUrl(lookup.garden.image))
+      : null;
+    const food = lookup?.food
+      ? await toDataUrl(resolveIconUrl(lookup.food.image))
+      : null;
+    return { recycling: rec, rubbish: rub, garden: gar, food };
   }
 
-  function resolveIconUrl(name, fallback) {
-    const n = String(name || "").trim() || fallback;
+  function resolveIconUrl(name) {
+    const n = String(name || "").trim();
+    if (!n) throw new Error("Missing icon path.");
     if (/^https?:\/\//i.test(n)) return n;
     return BIN_IMAGE_BASE + n;
   }
 
   async function toDataUrl(url) {
-    try {
-      const r = await fetch(url, { credentials: "omit", cache: "force-cache" });
-      if (!r.ok) throw new Error("image fail");
-      return await blobToDataUrl(await r.blob());
-    } catch (_) {
-      return null;
+    const r = await fetch(url, { credentials: "omit", cache: "force-cache" });
+    if (!r.ok) {
+      throw new Error("Failed to fetch icon URL: " + url + " (HTTP " + r.status + ")");
     }
+    return blobToDataUrl(await r.blob());
   }
 
   function buildPdf(jsPDFCtor, c) {
@@ -864,7 +834,7 @@
     const monthW = 18.9;
     const monthBodyW = gridW - monthW - monthBodyGap;
     const monthCounts = c.months.map((month) =>
-      collectMonthEvents(month, c.isWeekly, c.icons, col, primaryDayIndex).length
+      collectMonthEvents(month, c.isWeekly, c.icons, primaryDayIndex).length
     );
     const needsGlobalShrink = monthCounts.some((count) => {
       if (count <= 1) return false;
@@ -1051,18 +1021,7 @@
     const berryY = 4.2 * s;
     const xx = x - berryX;
     const yy = y - berryY;
-    try {
-      doc.addImage(HOLLY_DATA_URL, "PNG", xx, yy, w, h, undefined, "FAST");
-    } catch (_) {
-      doc.setFillColor(116, 153, 52);
-      doc.circle(x - 0.8 * s, y - 2.8 * s, 1.2 * s, "F");
-      doc.circle(x - 3.2 * s, y - 1.2 * s, 1.2 * s, "F");
-      doc.circle(x - 5.0 * s, y - 2.5 * s, 1.2 * s, "F");
-      doc.setFillColor(214, 0, 90);
-      doc.circle(x - 2.4 * s, y - 2.2 * s, 0.7 * s, "F");
-      doc.circle(x - 3.4 * s, y - 2.5 * s, 0.7 * s, "F");
-      doc.circle(x - 2.9 * s, y - 3.3 * s, 0.7 * s, "F");
-    }
+    doc.addImage(HOLLY_DATA_URL, "PNG", xx, yy, w, h, undefined, "FAST");
   }
 
   function drawHolidayArrow(doc, x, y) {
@@ -1076,38 +1035,12 @@
   }
 
   function getKeyItems(c) {
-    const items = [];
-    if (c.isWeekly) {
-      items.push({ label1: "Rubbish", icon: c.icons.rubbish, kind: "rubbish", colour: [36, 36, 36], slots: 1 });
-      items.push({ label1: "Recycling", icon: c.icons.recycling, kind: "recycling", colour: [214, 0, 90], slots: 1 });
-    } else {
-      items.push({ label1: "Rubbish", icon: c.icons.rubbish, kind: "rubbish", colour: [112, 112, 112] });
-      items.push({ label1: "Recycling", icon: c.icons.recycling, kind: "recycling", colour: [22, 101, 52] });
-    }
-    if (c.hasGarden) items.push({ label1: "Garden waste", icon: c.icons.garden, kind: "garden", colour: [130, 87, 38] });
-    if (c.hasFood) items.push({ label1: "Food waste", icon: c.icons.food, kind: "food", colour: [103, 72, 34] });
-
-    const seen = new Set();
-    for (const m of c.months || []) {
-      for (const ex of m.extraPanels || []) {
-        if (seen.has(ex.key)) continue;
-        seen.add(ex.key);
-        items.push({
-          label1: ex.label,
-          icon: (c.icons.extras && c.icons.extras[ex.key]) || c.icons.recycling,
-          kind: ex.kind || "other",
-          slots: 1,
-          colour: colourForKind(ex.kind || "other", {
-            rec: [22, 101, 52],
-            rub: [112, 112, 112],
-            gar: [130, 87, 38],
-            food: [103, 72, 34],
-            accent: [214, 0, 90],
-            muted: [71, 71, 71]
-          }, c.isWeekly)
-        });
-      }
-    }
+    const items = [
+      { label1: "Rubbish", icon: c.icons.rubbish, kind: "rubbish" },
+      { label1: "Recycling", icon: c.icons.recycling, kind: "recycling" }
+    ];
+    if (c.hasGarden) items.push({ label1: "Garden waste", icon: c.icons.garden, kind: "garden" });
+    if (c.hasFood) items.push({ label1: "Food waste", icon: c.icons.food, kind: "food" });
     return items;
   }
 
@@ -1129,7 +1062,7 @@
     doc.setFont("helvetica", "normal");
     doc.setFontSize(baseSize);
     const layouts = items.map((it) => {
-      const iconW = 8.4;
+      const iconW = 9.0;
       const iconH = iconW * 1.06;
       const textGap = 1.9;
       const label1 = String(it?.label1 || "");
@@ -1168,24 +1101,16 @@
     const itemMidY = (itemTop + itemBottom) / 2;
 
     let ix = bodyX + pad;
-    for (let i = 0; i < c.items.length; i++) {
-      const it = c.items[i];
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
       if (!it) continue;
-      const layout = layouts[i] || { itemW: 22, iconW: 8.4, iconH: 8.9, textGap: 1.9 };
+      const layout = layouts[i] || { itemW: 22, iconW: 9.0, iconH: 9.54, textGap: 1.9 };
       const itemW = layout.itemW;
       const iconW = layout.iconW;
       const iconH = layout.iconH;
       const iconY = itemMidY - iconH / 2;
       const iconX = ix;
-      if (Array.isArray(it.icons)) {
-        let multiX = iconX;
-        for (const part of it.icons) {
-          drawIcon(doc, part.icon, multiX, iconY, iconW, iconH, part.kind, part.colour);
-          multiX += iconW + 1.15;
-        }
-      } else {
-        drawIcon(doc, it.icon, iconX, iconY, iconW, iconH, it.kind, it.colour);
-      }
+      drawIcon(doc, it.icon, iconX, iconY, iconW, iconH);
       const textX = iconX + iconW + layout.textGap;
       const textW = Math.max(7.6, itemW - iconW - layout.textGap);
       let fz = c.keyItemSize || 12.4;
@@ -1233,7 +1158,7 @@
       : Math.max(1.5, fortPad - footerShift);
 
     doc.setFontSize(8.9);
-    doc.text("Generate your own collection calendar at github.com/AV1917/restore-hastings-bin-calendar", x + footerTextX, y + bh / 2 - 0.26 + pxToMm, { baseline: "middle" });
+    doc.text("Generate your own collection calendar at github.com/AV1917/restore-hastings-bin-calendar", x + footerTextX, y + bh / 2 - 0.26, { baseline: "middle" });
     if (!isWeekly) {
       const renderedFortLabel = getFortLabel(scheduleCode);
       if (renderedFortLabel) {
@@ -1244,36 +1169,20 @@
   }
 
   function normaliseDateItems(values) {
-    if (!Array.isArray(values)) return [];
+    if (!Array.isArray(values)) throw new Error("Invalid date list.");
     const out = [];
     for (const raw of values) {
-      let dateSource = raw;
-      let bold = false;
-      if (raw && typeof raw === "object" && !(raw instanceof Date)) {
-        dateSource =
-          raw.date ??
-          raw.Date ??
-          raw.value ??
-          raw.Value ??
-          raw.rawDate ??
-          raw.RawDate;
-        bold = !!(raw.bold ?? raw.Bold ?? raw.isBold ?? raw.IsBold);
+      const item = raw && typeof raw === "object" && !(raw instanceof Date) ? raw : null;
+      const source = item ? item.date : raw;
+      if (source === undefined || source === null) throw new Error("Invalid date item.");
+      let date;
+      if (source instanceof Date) date = new Date(source.getTime());
+      else {
+        const m = String(source).match(/\/Date\((\d+)(?:[+-]\d+)?\)\//);
+        date = m ? new Date(Number(m[1])) : new Date(source);
       }
-      let date = null;
-      if (dateSource instanceof Date) {
-        date = new Date(dateSource.getTime());
-      } else if (typeof dateSource === "string" || typeof dateSource === "number") {
-        const aspMatch = String(dateSource).match(/\/Date\((\d+)(?:[+-]\d+)?\)\//);
-        if (aspMatch) {
-          const ms = Number(aspMatch[1]);
-          if (Number.isFinite(ms)) date = new Date(ms);
-        } else {
-          const parsed = new Date(dateSource);
-          if (Number.isFinite(parsed.getTime())) date = parsed;
-        }
-      }
-      if (!date || !Number.isFinite(date.getTime())) continue;
-      out.push({ date, bold, estimated: false });
+      if (!Number.isFinite(date.getTime())) throw new Error("Invalid date item.");
+      out.push({ date, bold: !!item?.bold, estimated: !!item?.estimated });
     }
     return dedupeSortItems(out);
   }
@@ -1286,7 +1195,7 @@
   function drawMonthRow(doc, c) {
     const monthW = 18.9;
     const bodyGap = Number.isFinite(Number(c.bodyGap)) ? Number(c.bodyGap) : 3.4;
-    const events = collectMonthEvents(c.month, c.isWeekly, c.icons, c.col, c.primaryDayIndex);
+    const events = collectMonthEvents(c.month, c.isWeekly, c.icons, c.primaryDayIndex);
 
     doc.setFillColor(c.col.month[0], c.col.month[1], c.col.month[2]);
     doc.rect(c.x, c.y, monthW, c.h, "F");
@@ -1350,15 +1259,7 @@
     return ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][Number(idx) || 0] || "Jan";
   }
 
-  function colourForKind(kind, col, isWeekly) {
-    if (kind === "garden") return col.gar;
-    if (kind === "food") return col.food;
-    if (kind === "rubbish") return col.rub;
-    if (kind === "recycling") return col.rec;
-    return isWeekly ? col.accent : col.muted;
-  }
-
-  function collectMonthEvents(month, isWeekly, icons, col, primaryDayIndex) {
+  function collectMonthEvents(month, isWeekly, icons, primaryDayIndex) {
     const byDate = new Map();
     function ensure(date) {
       const k = date.getTime();
@@ -1370,8 +1271,8 @@
       const entry = ensure(dateItem.date);
       entry.bold = entry.bold || !!dateItem.bold;
       entry.hasCore = entry.hasCore || !!isCore;
-      const isCancelled = bin.id === "garden" && !!dateItem.cancelled;
-      const existing = entry.bins.find((b) => b.id === bin.id);
+      const isCancelled = bin.kind === "garden" && !!dateItem.cancelled;
+      const existing = entry.bins.find((b) => b.kind === bin.kind);
       if (!existing) {
         entry.bins.push(Object.assign({}, bin, { cancelled: isCancelled }));
       } else if (isCancelled) {
@@ -1379,10 +1280,10 @@
       }
     }
 
-    const recBin = { id: "recycling", kind: "recycling", icon: icons.recycling, colour: col.rec };
-    const rubBin = { id: "rubbish", kind: "rubbish", icon: icons.rubbish, colour: col.rub };
-    const garBin = { id: "garden", kind: "garden", icon: icons.garden, colour: col.gar };
-    const foodBin = { id: "food", kind: "food", icon: icons.food, colour: col.food };
+    const recBin = { kind: "recycling", icon: icons.recycling };
+    const rubBin = { kind: "rubbish", icon: icons.rubbish };
+    const garBin = { kind: "garden", icon: icons.garden };
+    const foodBin = { kind: "food", icon: icons.food };
 
     if (isWeekly) {
       for (const d of month.dates || []) {
@@ -1396,16 +1297,6 @@
 
     for (const d of month.garden || []) add(d, garBin, false);
     for (const d of month.food || []) add(d, foodBin, false);
-
-    for (const extra of month.extraPanels || []) {
-      const exBin = {
-        id: "extra-" + extra.key,
-        kind: extra.kind || "other",
-        icon: (icons.extras && icons.extras[extra.key]) || icons.recycling,
-        colour: colourForKind(extra.kind, col, isWeekly)
-      };
-      for (const d of extra.dates || []) add(d, exBin, false);
-    }
 
     return Array.from(byDate.values())
       .map((entry) => ({
@@ -1444,54 +1335,103 @@
     doc.setLineCap("butt");
     doc.setLineJoin("miter");
 
-    doc.setFont("helvetica", "bold");
-    const splitDate = !!c.shrinkMode;
-    doc.setFontSize(10.2);
-    doc.setTextColor(c.col.ink[0], c.col.ink[1], c.col.ink[2]);
-    let dateBottomY;
-    if (splitDate) {
-      const d = c.event.date;
-      const line1 = weekdayShort(d.getDay());
-      const line2 = ordinalDay(d.getDate());
-      doc.text(line1, c.x + c.w / 2, c.y + 4.9, { align: "center" });
-      doc.text(line2, c.x + c.w / 2, c.y + 9.1, { align: "center" });
-      dateBottomY = c.y + 10.0;
-    } else {
-      doc.text(fmtDate(c.event.date), c.x + c.w / 2, c.y + 5.2, { align: "center" });
-      dateBottomY = c.y + 6.0;
-    }
-
     const bins = (c.event.bins || [])
+      .filter((bin) => isKnownBinKind(bin?.kind))
       .slice()
       .sort((a, b) => {
         const pa = getBinPriority(a);
         const pb = getBinPriority(b);
         if (pa !== pb) return pa - pb;
-        return String(a?.id || "").localeCompare(String(b?.id || ""));
+        return String(a?.kind || "").localeCompare(String(b?.kind || ""));
       })
       .slice(0, 4);
-    if (bins.length > 0) {
-      const zoneTop = dateBottomY + 0.35;
-      const zoneBottom = c.y + c.h - 0.75;
-      const zoneH = Math.max(2.2, zoneBottom - zoneTop);
-      const padX = 1.6;
-      const availW = Math.max(2.4, c.w - padX * 2);
-      const normalGap = 0.85;
-      const naturalFrameW = 6.6;
-      const sideBySideW = naturalFrameW * bins.length + normalGap * Math.max(0, bins.length - 1);
-      let frameW = naturalFrameW;
-      let step = frameW + normalGap;
+    doc.setFont("helvetica", "bold");
+    const splitDate = !!c.shrinkMode;
+    doc.setFontSize(10.2);
+    doc.setTextColor(c.col.ink[0], c.col.ink[1], c.col.ink[2]);
+    let centeredLayout = null;
+    let dateBottomY = c.y + 6.0;
+    if (splitDate) {
+      const dateBlockH = 8.2;
+      const dateLineGap = 4.15;
+      const dateSplitBaselineOffset = 3.05;
+      const contentGapY = bins.length ? 0.6 : 0;
+      const innerPadY = 0.6;
+      let frameW = 0;
+      let step = 0;
       let overlap = false;
-      if (sideBySideW > availW && bins.length > 1) {
-        overlap = true;
-        step = bins.length > 1 ? (availW - frameW) / (bins.length - 1) : frameW;
-        step = Math.max(frameW * 0.25, Math.min(step, frameW + normalGap));
+      let normalGap = 0.85;
+      if (bins.length > 0) {
+        const padX = 1.6;
+        const availW = Math.max(2.4, c.w - padX * 2);
+        const naturalFrameW = 7.2;
+        const sideBySideW = naturalFrameW * bins.length + normalGap * Math.max(0, bins.length - 1);
+        frameW = naturalFrameW;
+        step = frameW + normalGap;
+        if (sideBySideW > availW && bins.length > 1) {
+          overlap = true;
+          step = bins.length > 1 ? (availW - frameW) / (bins.length - 1) : frameW;
+          step = Math.max(frameW * 0.25, Math.min(step, frameW + normalGap));
+        }
+        frameW = Math.max(2.2, Math.min(frameW, naturalFrameW));
       }
-      frameW = Math.max(2.2, Math.min(frameW, naturalFrameW));
-      const frameH = Math.max(2.5, Math.min(zoneH, frameW * 1.1));
+      let frameH = bins.length > 0 ? Math.max(2.5, frameW * 1.1) : 0;
+      const minContentH = Math.max(2.2, c.h - innerPadY * 2);
+      if (bins.length > 0) {
+        const maxFrameH = Math.max(2.2, minContentH - dateBlockH - contentGapY);
+        frameH = Math.min(frameH, maxFrameH);
+      }
+      const totalContentH = dateBlockH + contentGapY + frameH;
+      const contentTop = c.y + (c.h - totalContentH) / 2;
+      const d = c.event.date;
+      const line1 = weekdayShort(d.getDay());
+      const line2 = ordinalDay(d.getDate());
+      const line1Y = contentTop + dateSplitBaselineOffset;
+      const line2Y = line1Y + dateLineGap;
+      doc.text(line1, c.x + c.w / 2, line1Y, { align: "center" });
+      doc.text(line2, c.x + c.w / 2, line2Y, { align: "center" });
+      dateBottomY = contentTop + dateBlockH;
+      centeredLayout = { frameW, frameH, step, overlap, normalGap, zoneTop: dateBottomY + contentGapY };
+    } else {
+      doc.text(fmtDate(c.event.date), c.x + c.w / 2, c.y + 5.2, { align: "center" });
+    }
+    if (bins.length > 0) {
+      let frameW;
+      let frameH;
+      let step;
+      let overlap;
+      let normalGap;
+      let zoneTop;
+      if (splitDate && centeredLayout) {
+        frameW = centeredLayout.frameW;
+        frameH = centeredLayout.frameH;
+        step = centeredLayout.step;
+        overlap = centeredLayout.overlap;
+        normalGap = centeredLayout.normalGap;
+        zoneTop = centeredLayout.zoneTop;
+      } else {
+        zoneTop = dateBottomY + 0.35;
+        const zoneBottom = c.y + c.h - 0.75;
+        const zoneH = Math.max(2.2, zoneBottom - zoneTop);
+        const padX = 1.6;
+        const availW = Math.max(2.4, c.w - padX * 2);
+        normalGap = 0.85;
+        const naturalFrameW = 7.2;
+        const sideBySideW = naturalFrameW * bins.length + normalGap * Math.max(0, bins.length - 1);
+        frameW = naturalFrameW;
+        step = frameW + normalGap;
+        overlap = false;
+        if (sideBySideW > availW && bins.length > 1) {
+          overlap = true;
+          step = bins.length > 1 ? (availW - frameW) / (bins.length - 1) : frameW;
+          step = Math.max(frameW * 0.25, Math.min(step, frameW + normalGap));
+        }
+        frameW = Math.max(2.2, Math.min(frameW, naturalFrameW));
+        frameH = Math.max(2.5, Math.min(zoneH, frameW * 1.1));
+      }
       const totalW = overlap ? (frameW + step * (bins.length - 1)) : (frameW * bins.length + normalGap * (bins.length - 1));
       const startX = c.x + (c.w - totalW) / 2;
-      const frameY = zoneTop + (zoneH - frameH) / 2;
+      const frameY = splitDate ? zoneTop : zoneTop + ((c.y + c.h - 0.75) - zoneTop - frameH) / 2;
       const frames = [];
       for (let i = 0; i < bins.length; i++) {
         frames.push({
@@ -1505,11 +1445,11 @@
       if (overlap) {
         for (let i = frames.length - 1; i >= 0; i--) {
           const f = frames[i];
-          drawIcon(doc, f.bin.icon, f.x, f.y, f.w, f.h, f.bin.kind, f.bin.colour);
+          drawIcon(doc, f.bin.icon, f.x, f.y, f.w, f.h);
         }
       } else {
         for (const f of frames) {
-          drawIcon(doc, f.bin.icon, f.x, f.y, f.w, f.h, f.bin.kind, f.bin.colour);
+          drawIcon(doc, f.bin.icon, f.x, f.y, f.w, f.h);
         }
       }
     }
@@ -1536,14 +1476,16 @@
     doc.line(x + w - inset, y + inset, x + inset, y + h - inset);
   }
 
+  function isKnownBinKind(kind) {
+    return kind === "rubbish" || kind === "recycling" || kind === "garden" || kind === "food";
+  }
+
   function getBinPriority(bin) {
-    const id = String(bin?.id || "");
-    if (id === "rubbish") return 0;
-    if (id === "recycling") return 1;
-    if (id === "garden") return 2;
-    if (id === "food") return 3;
-    if (id.startsWith("extra-")) return 100;
-    return 999;
+    const kind = String(bin?.kind || "");
+    if (kind === "rubbish") return 0;
+    if (kind === "recycling") return 1;
+    if (kind === "garden") return 2;
+    if (kind === "food") return 3;
   }
 
   function primaryCollectionDay(months, isWeekly) {
@@ -1562,56 +1504,19 @@
     return items[0].date.toLocaleDateString("en-GB", { weekday: "long" });
   }
 
-  function makeServiceKey(name, id, idx) {
-    const base = String(name || "service")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "");
-    const suffix = Number.isFinite(Number(id)) ? String(id) : String(idx || 0);
-    return (base || "service") + "-" + suffix;
-  }
-
-  function drawIcon(doc, dataUrl, x, y, w, h, kind, colour) {
-    if (dataUrl) {
-      try {
-        let dx = x;
-        let dy = y;
-        let dw = w;
-        let dh = h;
-        try {
-          const props = doc.getImageProperties(dataUrl);
-          const iw = Number(props?.width) || 0;
-          const ih = Number(props?.height) || 0;
-          if (iw > 0 && ih > 0) {
-            const scale = Math.min(w / iw, h / ih);
-            dw = iw * scale;
-            dh = ih * scale;
-            dx = x + (w - dw) / 2;
-            dy = y + (h - dh) / 2;
-          }
-        } catch (_) {}
-        doc.addImage(dataUrl, "PNG", dx, dy, dw, dh, undefined, "FAST");
-        return;
-      } catch (_) {}
-    }
-    fallbackIcon(doc, x, y, w, h, kind, colour);
-  }
-
-  function fallbackIcon(doc, x, y, w, h, kind, colour) {
-    doc.setLineWidth(0.22);
-    doc.setDrawColor(colour[0], colour[1], colour[2]);
-    doc.rect(x + w * 0.2, y + h * 0.28, w * 0.6, h * 0.58, "S");
-    doc.rect(x + w * 0.14, y + h * 0.16, w * 0.72, h * 0.1, "S");
-    doc.circle(x + w * 0.32, y + h * 0.93, w * 0.07, "S");
-    doc.circle(x + w * 0.68, y + h * 0.93, w * 0.07, "S");
-    if (kind === "recycling") doc.circle(x + w * 0.5, y + h * 0.53, w * 0.13, "S");
-    else if (kind === "rubbish") {
-      doc.line(x + w * 0.41, y + h * 0.44, x + w * 0.59, y + h * 0.62);
-      doc.line(x + w * 0.59, y + h * 0.44, x + w * 0.41, y + h * 0.62);
-    } else if (kind === "garden") {
-      doc.circle(x + w * 0.5, y + h * 0.53, w * 0.08, "S");
-      doc.line(x + w * 0.5, y + h * 0.45, x + w * 0.5, y + h * 0.62);
-    }
+  function drawIcon(doc, dataUrl, x, y, w, h) {
+    const src = String(dataUrl || "").trim();
+    if (!src) throw new Error("Missing icon.");
+    const props = doc.getImageProperties(src);
+    const iw = Number(props?.width);
+    const ih = Number(props?.height);
+    if (!(iw > 0 && ih > 0)) throw new Error("Invalid icon.");
+    const scale = Math.min(w / iw, h / ih);
+    const dw = iw * scale;
+    const dh = ih * scale;
+    const dx = x + (w - dw) / 2;
+    const dy = y + (h - dh) / 2;
+    doc.addImage(src, "PNG", dx, dy, dw, dh, undefined, "FAST");
   }
 
   function fmtDate(d) {
@@ -1691,25 +1596,6 @@
     return Array.from(m.values()).sort((a, b) => a.date - b.date);
   }
 
-  function fitText(doc, text, maxWidth, fontSize) {
-    const src = String(text || "");
-    if (!src) return "";
-    const oldSize = doc.getFontSize();
-    if (Number.isFinite(fontSize) && fontSize > 0) doc.setFontSize(fontSize);
-    if (doc.getTextWidth(src) <= maxWidth) {
-      if (Number.isFinite(oldSize)) doc.setFontSize(oldSize);
-      return src;
-    }
-    let out = src;
-    while (out.length > 1 && doc.getTextWidth(out) > maxWidth) out = out.slice(0, -1);
-    if (out.length < src.length && out.length > 1) {
-      while (out.length > 1 && doc.getTextWidth(out + "...") > maxWidth) out = out.slice(0, -1);
-      out += "...";
-    }
-    if (Number.isFinite(oldSize)) doc.setFontSize(oldSize);
-    return out;
-  }
-
   function wrapTextLines(doc, text, maxWidth, maxLines, fontSize) {
     const src = String(text || "").trim();
     if (!src) return [""];
@@ -1729,14 +1615,19 @@
   async function getJsPdfCtor() {
     let ctor = findJsPdfCtor();
     if (ctor) return ctor;
+    const loadErrors = [];
     for (const src of JSPDF_SRC) {
       try {
         await injectScript(src);
-      } catch (_) {}
+      } catch (error) {
+        loadErrors.push("Failed to load jsPDF source " + src + ": " + (error && error.message ? error.message : String(error)));
+        continue;
+      }
       ctor = findJsPdfCtor();
       if (ctor) return ctor;
+      loadErrors.push("jsPDF source loaded but constructor was unavailable: " + src);
     }
-    throw new Error("jsPDF is not available.");
+    throw new Error("jsPDF is not available. " + loadErrors.join(" | "));
   }
 
   function findJsPdfCtor() {
