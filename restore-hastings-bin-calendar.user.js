@@ -2,7 +2,7 @@
 // @name         Restore Hastings Bin Calendar
 // @namespace    https://github.com/AV1917
 // @homepage     https://github.com/AV1917
-// @version      1.0.1
+// @version      1.0.2
 // @description  A userscript that recreates the PDF download for the selected bin collection schedule and puts it back where it belongs on the Hastings Borough Council webpage.
 // @icon         https://github.com/AV1917/restore-hastings-bin-calendar/raw/main/docs/RHBC.png
 // @author       AV1917
