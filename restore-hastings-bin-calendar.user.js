@@ -418,11 +418,14 @@
   }
 
   function shouldExtrapolateFoodDate(date, calendarYear, lateYearSeedCutoff, allowLateYearExtrapolation, gardenRule) {
-    if (date.getFullYear() === calendarYear) {
-      return allowLateYearExtrapolation || date < lateYearSeedCutoff;
-    }
-    if (date.getFullYear() === calendarYear - 1) {
-      return !isDateWithinGardenSuspensionWindow(date, calendarYear - 1, gardenRule);
+    const inPreviousChristmasWindow = isDateWithinGardenSuspensionWindow(date, calendarYear - 1, gardenRule);
+    if (inPreviousChristmasWindow) return false;
+
+    const inCurrentChristmasWindow = isDateWithinGardenSuspensionWindow(date, calendarYear, gardenRule);
+    if (inCurrentChristmasWindow && !allowLateYearExtrapolation) return false;
+
+    if (date.getFullYear() === calendarYear && date >= lateYearSeedCutoff) {
+      return allowLateYearExtrapolation;
     }
     return true;
   }
