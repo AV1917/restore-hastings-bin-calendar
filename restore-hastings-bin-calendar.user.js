@@ -20,6 +20,7 @@
   const LOOKUP_ENDPOINT = "/MyArea/CollectionDays.asmx/LookupCollectionDaysByService";
   const CALENDAR_BASE = "/waste_recycling/calendars2024/";
   const BIN_IMAGE_BASE = "https://fs-filestore-eu.s3.amazonaws.com/hastings/live/self/images/bins/";
+  const GARDEN_WASTE_ICON_URL = "https://github.com/AV1917/restore-hastings-bin-calendar/raw/main/docs/gw-240-new.png";
   const DATE_RE = /(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\s+\d{1,2}\s+[A-Za-z]+\s+\d{4}/g;
   const MONTHS = {
     january: 0,
@@ -709,7 +710,7 @@
     const rec = await toDataUrl(resolveIconUrl(lookup?.recycling?.image));
     const rub = await toDataUrl(resolveIconUrl(lookup?.rubbish?.image));
     const gar = lookup?.garden
-      ? await toDataUrl(resolveIconUrl(lookup.garden.image))
+      ? await toDataUrl(GARDEN_WASTE_ICON_URL)
       : null;
     const food = lookup?.food
       ? await toDataUrl(resolveIconUrl(lookup.food.image))
