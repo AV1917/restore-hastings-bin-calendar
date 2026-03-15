@@ -2,7 +2,7 @@
 // @name         Restore Hastings Bin Calendar
 // @namespace    https://github.com/AV1917
 // @homepage     https://github.com/AV1917
-// @version      1.0.2
+// @version      1.0.3
 // @description  A userscript that recreates the PDF download for the selected bin collection schedule and puts it back where it belongs on the Hastings Borough Council webpage.
 // @icon         https://github.com/AV1917/restore-hastings-bin-calendar/raw/main/docs/RHBC.png
 // @author       AV1917
@@ -10,7 +10,9 @@
 // @require      https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js
 // @downloadURL  https://github.com/AV1917/restore-hastings-bin-calendar/raw/main/restore-hastings-bin-calendar.user.js
 // @updateURL    https://github.com/AV1917/restore-hastings-bin-calendar/raw/main/restore-hastings-bin-calendar.user.js
-// @grant        none
+// @grant        GM_xmlhttpRequest
+// @connect      fs-filestore-eu.s3.amazonaws.com
+// @connect      raw.githubusercontent.com
 // @run-at       document-end
 // ==/UserScript==
 
@@ -726,11 +728,22 @@
   }
 
   async function toDataUrl(url) {
-    const r = await fetch(url, { credentials: "omit", cache: "force-cache" });
-    if (!r.ok) {
-      throw new Error("Failed to fetch icon URL: " + url + " (HTTP " + r.status + ")");
-    }
-    return blobToDataUrl(await r.blob());
+    const blob = await new Promise((resolve, reject) => {
+      GM_xmlhttpRequest({
+        method: "GET",
+        url,
+        responseType: "blob",
+        onload: (response) => {
+          const status = Number(response?.status) || 0;
+          if (status < 200 || status >= 300 || !(response?.response instanceof Blob)) {
+            reject(new Error("Failed to fetch icon URL: " + url + " (HTTP " + status + ")"));
+            return;
+          }
+          resolve(response.response);
+        }
+      });
+    });
+    return blobToDataUrl(blob);
   }
 
   function buildPdf(jsPDFCtor, c) {
