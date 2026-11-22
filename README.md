@@ -50,13 +50,9 @@ Very roughly, this script combines three things:
 
 - The live lookup data from the page
 - The full Hastings calendar page for your schedule
-- The Hastings Christmas news announcements for garden-waste suspensions
+- The Hastings Christmas / New Year collections page
 
 If garden waste or food waste dates are incomplete, it can extend the pattern from the real dates it already has. Real website dates always take priority over extrapolated ones.
-
-Food waste uses the normal-to-revised dates in the calendar page's food waste exceptions table for Christmas and New Year collections.
-
-Garden waste uses the current year's Christmas news announcement, trying the council's different URL formats. Until it is published, the previous year's pause is carried forward. The year comes from today's date, even if the calendar is already showing next year. Later garden dates are still omitted from the assumed Christmas pause start, so the calendar does not guess the following winter's collections.
 
 Over the Christmas period, if no real data is available, food waste and garden waste are omitted to ensure that calendar dates are as accurate as possible.
 
