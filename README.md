@@ -27,14 +27,14 @@ All efforts have been taken to make the PDF look as much like the original PDF p
 
 ## Comparisons
 ### Weekly
-| [Original](docs/original/RecTueRefTue.pdf) | [New](docs/new/RecTueRefTue-2026.pdf) |
+| [Original](docs/original/RecTueRefTue.pdf) | [New](docs/new/RecTueRefTue-2027.pdf) |
 | :--- | :--- |
-| ![Original weekly calendar](docs/original/RecTueRefTue.png) | ![New weekly calendar](docs/new/RecTueRefTue-2026.png) |
+| ![Original weekly calendar](docs/original/RecTueRefTue.png) | ![New weekly calendar](docs/new/RecTueRefTue-2027.png) |
 
 ### Fortnightly
-| [Original](docs/original/RecTueFort1RefTueFort2.pdf) | [New](docs/new/RecTueFort1RefTueFort2-2026.pdf) |
+| [Original](docs/original/RecTueFort1RefTueFort2.pdf) | [New](docs/new/RecTueFort1RefTueFort2-2027.pdf) |
 | :--- | :--- |
-| ![Original fortnightly calendar](docs/original/RecTueFort1RefTueFort2.png) | ![New fortnightly calendar](docs/new/RecTueFort1RefTueFort2-2026.png) |
+| ![Original fortnightly calendar](docs/original/RecTueFort1RefTueFort2.png) | ![New fortnightly calendar](docs/new/RecTueFort1RefTueFort2-2027.png) |
 
 ## What it does
 After you run an address lookup on the Hastings collection lookup page, the script:
