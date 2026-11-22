@@ -46,15 +46,12 @@ After you run an address lookup on the Hastings collection lookup page, the scri
 - Shows Christmas / New Year exceptions at the top
 
 ## How it works
-Very roughly, this script combines three things:
+Very roughly, this script combines four methods to produce the complete yearly calendar:
 
 - The live lookup data from the page
 - The full Hastings calendar page for your schedule
-- The Hastings Christmas / New Year collections page
-
-If garden waste or food waste dates are incomplete, it can extend the pattern from the real dates it already has. Real website dates always take priority over extrapolated ones.
-
-Over the Christmas period, if no real data is available, food waste and garden waste are omitted to ensure that calendar dates are as accurate as possible.
+- The yearly Hastings Christmas / New Year service changes page
+- Extrapolation, where garden waste or food waste dates are incomplete
 
 ## Disclaimer
 - This userscript is unofficial and is in no way affiliated with Hastings Borough Council.
