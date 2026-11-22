@@ -6,7 +6,7 @@ This userscript puts the **Download your full collection calendar as a PDF** but
 
 All efforts have been taken to make the PDF look as much like the original PDF provided by the council as possible – but not without some improvements:
 
-- Shows garden waste and food waste too – not just rubbish and recycling
+- Shows garden waste and food waste, too – not just rubbish and recycling – with an additional option to exclude food waste if you don't use it
 - Includes holiday exceptions and cancellations (where available)
 - Built in true A4 to make better use of the available space
 
@@ -20,7 +20,8 @@ All efforts have been taken to make the PDF look as much like the original PDF p
 1. Go to: https://www.hastings.gov.uk/waste_recycling/lookup/
 2. Make sure Tampermonkey is running with the script enabled - you should see a red (1) badge on the icon
 2. Run your normal address lookup
-3. Click **Download your full collection calendar as a PDF**
+3. Leave **Include food waste** checked (the default), or uncheck it to exclude food waste
+4. Click **Download your full collection calendar as a PDF**
 
 ![Original weekly calendar](docs/button_location.png)
 
@@ -49,9 +50,13 @@ Very roughly, this script combines three things:
 
 - The live lookup data from the page
 - The full Hastings calendar page for your schedule
-- The Hastings Christmas / New Year collections page
+- The Hastings Christmas news announcements for garden-waste suspensions
 
 If garden waste or food waste dates are incomplete, it can extend the pattern from the real dates it already has. Real website dates always take priority over extrapolated ones.
+
+Food waste uses the normal-to-revised dates in the calendar page's food waste exceptions table for Christmas and New Year collections.
+
+Garden waste uses the current year's Christmas news announcement, trying the council's different URL formats. Until it is published, the previous year's pause is carried forward. The year comes from today's date, even if the calendar is already showing next year. Later garden dates are still omitted from the assumed Christmas pause start, so the calendar does not guess the following winter's collections.
 
 Over the Christmas period, if no real data is available, food waste and garden waste are omitted to ensure that calendar dates are as accurate as possible.
 
