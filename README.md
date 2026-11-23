@@ -27,14 +27,28 @@ All efforts have been taken to make the PDF look as much like the original PDF p
 
 ## Comparisons
 ### Weekly
-| [Original](docs/original/RecTueRefTue.pdf) | [New](docs/new/RecTueRefTue-2027.pdf) |
-| :--- | :--- |
-| ![Original weekly calendar](docs/original/RecTueRefTue.png) | ![New weekly calendar](docs/new/RecTueRefTue-2027.png) |
+<table width="100%">
+  <tr>
+    <th width="40%" align="left"><a href="docs/original/RecTueRefTue.pdf">Original</a></th>
+    <th width="60%" align="left"><a href="docs/new/RecTueRefTue-2027.pdf">New (food waste enabled)</a></th>
+  </tr>
+  <tr>
+    <td width="40%"><img src="docs/original/RecTueRefTue.png" width="100%"></td>
+    <td width="60%"><img src="docs/new/RecTueRefTue-2027.png" width="100%"></td>
+  </tr>
+</table>
 
 ### Fortnightly
-| [Original](docs/original/RecTueFort1RefTueFort2.pdf) | [New](docs/new/RecTueFort1RefTueFort2-2027.pdf) |
-| :--- | :--- |
-| ![Original fortnightly calendar](docs/original/RecTueFort1RefTueFort2.png) | ![New fortnightly calendar](docs/new/RecTueFort1RefTueFort2-2027.png) |
+<table width="100%">
+  <tr>
+    <th width="40%" align="left"><a href="docs/original/RecTueFort1RefTueFort2.pdf">Original</a></th>
+    <th width="60%" align="left"><a href="docs/new/RecTueFort1RefTueFort2-2027.pdf">New (food waste disabled)</a></th>
+  </tr>
+  <tr>
+    <td width="40%"><img src="docs/original/RecTueFort1RefTueFort2.png" width="100%"></td>
+    <td width="60%"><img src="docs/new/RecTueFort1RefTueFort2-2027.png" width="100%"></td>
+  </tr>
+</table>
 
 ## What it does
 After you run an address lookup on the Hastings collection lookup page, the script:
@@ -47,11 +61,10 @@ After you run an address lookup on the Hastings collection lookup page, the scri
 
 ## How it works
 Very roughly, this script combines four methods to produce the complete yearly calendar:
-
 - The live lookup data from the page
 - The full Hastings calendar page for your schedule
 - The yearly Hastings Christmas / New Year service changes page
 - Extrapolation, where garden waste or food waste dates are incomplete
 
 ## Disclaimer
-- This userscript is unofficial and is in no way affiliated with Hastings Borough Council.
+- This userscript is unofficial and is in no way affiliated with Hastings Borough Council
