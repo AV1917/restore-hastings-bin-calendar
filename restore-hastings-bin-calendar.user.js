@@ -2,7 +2,7 @@
 // @name         Restore Hastings Bin Calendar
 // @namespace    https://github.com/AV1917
 // @homepage     https://github.com/AV1917
-// @version      1.0.4
+// @version      1.0.5
 // @description  A userscript that recreates the PDF download for the selected bin collection schedule and puts it back where it belongs on the Hastings Borough Council webpage.
 // @icon         https://github.com/AV1917/restore-hastings-bin-calendar/raw/main/docs/RHBC.png
 // @author       AV1917
@@ -194,7 +194,7 @@
       } else {
         for (const month of months) month.food = [];
       }
-      await markCancelledGardenCollections(months, gardenRule);
+      markCancelledGardenCollections(months, gardenRule);
       pruneEmptyLeadMonth(months, cal.isWeekly);
       const icons = await loadIcons(lookup, includeFood);
       const jsPDFCtor = await getJsPdfCtor();
@@ -621,168 +621,189 @@
     if (!hasCore && !hasExtras) months.shift();
   }
 
-  async function markCancelledGardenCollections(months, rule) {
-    const hasGarden = Array.isArray(months) && months.some((m) => Array.isArray(m.garden) && m.garden.length > 0);
-    if (!hasGarden) return;
-    if (rule === undefined) rule = await getGardenSuspensionRule();
-    const windows = buildGardenCancellationWindows(months, rule);
-    if (!windows.length) return;
-    for (const month of months) {
-      const nextGarden = [];
-      for (const item of month.garden || []) {
-        item.cancelled = false;
-        const window = windows.find((w) => item.date >= w.start && item.date < w.resume);
-        if (!window) {
-          nextGarden.push(item);
-          continue;
-        }
-        if (window.mode === "omit") continue;
-        item.cancelled = true;
-        nextGarden.push(item);
-      }
-      month.garden = nextGarden;
-    }
-  }
+function gardenSuspensionWindow(year, rule) {
+    if (!rule) return null;
 
-  function buildGardenCancellationWindows(months, rule) {
-    const gardenDates = (Array.isArray(months) ? months : [])
-      .flatMap((m) => Array.isArray(m?.garden) ? m.garden : [])
-      .map((item) => item?.date)
-      .filter((date) => date instanceof Date && Number.isFinite(date.getTime()));
-    if (!gardenDates.length) return [];
-    const minDate = new Date(Math.min(...gardenDates.map((date) => date.getTime())));
-    const maxDate = new Date(Math.max(...gardenDates.map((date) => date.getTime())));
-    const minYear = minDate.getFullYear();
-    const maxYear = maxDate.getFullYear();
-    const startOffsetDays = Number.isFinite(rule?.startOffsetDays) ? Number(rule.startOffsetDays) : 0;
-    const durationDays = Number.isFinite(rule?.durationDays) && rule.durationDays > 0 ? Number(rule.durationDays) : 14;
-    const appliesThroughChristmasYear = rule?.appliesThroughChristmasYear ?? rule?.sourceChristmasYear ?? new Date().getFullYear();
-    const out = [];
-    for (let christmasYear = minYear - 1; christmasYear <= maxYear; christmasYear++) {
-      const christmas = new Date(christmasYear, 11, 25);
-      const start = addDays(christmas, startOffsetDays);
-      const resume = addDays(start, durationDays);
-      if (resume <= minDate || start > maxDate) continue;
-      out.push({
-        start,
-        resume,
-        mode: christmasYear > appliesThroughChristmasYear ? "omit" : "cancel"
-      });
-    }
-    return out;
-  }
+    return {
+        start: new Date(year, 11, rule.startDay),
+        resume: new Date(year + 1, 0, rule.resumeDay)
+    };
+}
 
   function isDateWithinGardenSuspensionWindow(date, christmasYear, rule) {
-    if (!(date instanceof Date) || !Number.isFinite(date.getTime()) || !rule) return false;
-    const startOffsetDays = Number.isFinite(rule?.startOffsetDays) ? Number(rule.startOffsetDays) : 0;
-    const durationDays = Number.isFinite(rule?.durationDays) && rule.durationDays > 0 ? Number(rule.durationDays) : 14;
-    const christmas = new Date(christmasYear, 11, 25);
-    const start = addDays(christmas, startOffsetDays);
-    const resume = addDays(start, durationDays);
-    return date >= start && date < resume;
+    const window = gardenSuspensionWindow(christmasYear, rule);
+    return !!window && date >= window.start && date < window.resume;
+  }
+
+  function markCancelledGardenCollections(months, rule) {
+    for (const month of months) {
+      month.garden = (month.garden || []).filter((item) => {
+        const year = item.date.getFullYear() - (item.date.getMonth() === 0 ? 1 : 0);
+        item.cancelled = isDateWithinGardenSuspensionWindow(item.date, year, rule);
+        return !item.cancelled || year <= rule.appliesThroughChristmasYear;
+      });
+    }
   }
 
   async function getGardenSuspensionRule(currentYear = new Date().getFullYear()) {
     if (state.gardenSuspensionRules.has(currentYear)) return state.gardenSuspensionRules.get(currentYear);
-    const loadRule = async (path, year) => {
+    async function loadRule(path, urlYear) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 6000);
       try {
         const url = new URL(path, location.origin).toString();
-        const res = await fetch(url, { credentials: "include", cache: "no-cache", signal: controller.signal });
-        if (!res.ok) return null;
-        const doc = new DOMParser().parseFromString(await res.text(), "text/html");
-        const text = norm((doc.querySelector("#PageBody") || doc.body)?.textContent || "");
-        const publishedYear = text.match(/Published\s+\d{1,2}\/\d{1,2}\/(\d{4})/i)?.[1];
-        if (year !== undefined && publishedYear && Number(publishedYear) !== year) return null;
-        const calendarYear = text.match(/Christmas and New Year waste calendar\s+(\d{4})\s*\//i)?.[1];
-        const parsed = parseGardenSuspensionRule(text, year) ||
-          (year === undefined && calendarYear ? parseGardenSuspensionRule(text, Number(calendarYear)) : null);
-        if (!parsed || (year !== undefined && parsed.sourceChristmasYear !== year)) return null;
-        return Object.assign(parsed, { sourceUrl: url, appliesThroughChristmasYear: currentYear });
+        const response = await fetch(url, { credentials: "include", cache: "no-cache", signal: controller.signal });
+        if (!response.ok) return null;
+        const doc = new DOMParser().parseFromString(await response.text(), "text/html");
+        const content = doc.querySelector("#PageBody") || doc.body;
+        const publication = doc.querySelector("#PublishDatePrimary, #PublishDate")?.textContent || content.textContent;
+        const publishedYear = publication.match(/Published\s+\d{1,2}\/\d{1,2}\/(\d{4})/i)?.[1];
+        const rule = parseGardenSuspensionRule(content);
+        if (!rule) return null;
+        return {
+          ...rule,
+          sourceChristmasYear: rule.sourceChristmasYear ?? (publishedYear ? Number(publishedYear) : urlYear ?? null),
+          sourceUrl: url,
+          appliesThroughChristmasYear: currentYear
+        };
+      } catch (error) {
+        console.warn("[HBC PDF] Christmas collections lookup failed:", path, error);
+        return null;
       } finally {
         clearTimeout(timeout);
       }
-    };
-    let primaryRule = null;
-    try {
-      primaryRule = await loadRule(XMAS_COLLECTIONS_PATH);
-    } catch (error) {
-      console.warn("[HBC PDF] Christmas collections lookup failed:", error);
     }
-    for (const year of [currentYear, currentYear - 1]) {
-      if (primaryRule?.sourceChristmasYear === year) {
-        state.gardenSuspensionRules.set(currentYear, primaryRule);
-        return primaryRule;
-      }
-      const slugs = [
-        "christmas-" + year,
-        "Christmas" + year,
-        "christmas-wate-" + year,
-        "christmas-waste-" + year,
-        "christmas" + year
-      ];
-      const results = await Promise.allSettled(slugs.map((slug) => loadRule(CHRISTMAS_NEWS_BASE + slug + "/", year)));
-      const rule = results.find((result) => result.status === "fulfilled" && result.value)?.value;
-      if (rule) {
-        state.gardenSuspensionRules.set(currentYear, rule);
-        return rule;
-      }
+
+    const primary = await loadRule(XMAS_COLLECTIONS_PATH);
+    const candidates = [primary];
+    if (!(primary?.sourceChristmasYear >= currentYear)) {
+      const news = [currentYear, currentYear - 1].flatMap((year) =>
+        ["christmas-" + year, "Christmas" + year].map((slug) => loadRule(CHRISTMAS_NEWS_BASE + slug + "/", year)));
+      candidates.push(...await Promise.all(news));
     }
-    state.gardenSuspensionRules.set(currentYear, null);
+    const rule = candidates.filter(Boolean).sort((a, b) =>
+      (b.sourceChristmasYear ?? 0) - (a.sourceChristmasYear ?? 0))[0] ?? null;
+    state.gardenSuspensionRules.set(currentYear, rule);
+    return rule;
+  }
+
+  function normaliseGardenText(text) {
+    // both split words occur on the council's 2025 / 26 Christmas collections page
+    return norm(String(text || "").normalize("NFKC").replace(/[\u200b-\u200d\ufeff]/g, ""))
+      .replace(/\bG\s+arden\b/gi, "Garden")
+      .replace(/\bJan\s+uary\b/gi, "January")
+      .replace(/[\u2010-\u2014]/g, "-")
+      .replace(/\b(Jan|Dec)\.(?=\s|$)/gi, "$1");
+  }
+
+  function gardenTopic(text) {
+    if (/\bgarden[\s-]+(?:waste|bins?)\b|\bgarden\s*(?:and|&|\/)\s*bulky\b|\bbulky(?:[\s-]+waste)?\s*(?:and|&|\/)\s*garden\b/i.test(text)) return "garden";
+    if (/\b(?:bulky(?:[\s-]+waste)?|food[\s-]+waste|rubbish|recycling|council offices?)\b/i.test(text)) return "other";
     return null;
   }
 
-  function parseGardenSuspensionRule(text, christmasYear) {
-    const src = norm(text).replace(/\bG\s+arden\b/gi, "Garden").replace(/\bJan\s+uary\b/gi, "January");
-    if (!src) return null;
-    const dayName = "(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)";
-    const re = new RegExp(
-      "garden waste(?: and bulky waste)? collections (?:are|will be) (?:also )?suspended from\\s+" +
-      dayName +
-      "\\s+(\\d{1,2})\\s+([A-Za-z]+)(?:\\s+(\\d{4}))?\\s*" +
-      "(?:,\\s*)?(?:and\\s+)?(?:will\\s+)?(?:restart(?:s)?|re-?start(?:s)?|(?:are\\s+)?back to normal|return(?:s)?\\s+to\\s+normal)\\s+on\\s+" +
-      dayName +
-      "\\s+(\\d{1,2})\\s+([A-Za-z]+)(?:\\s+(\\d{4}))?",
-      "i"
-    );
-    const m = src.match(re);
-    if (!m) return null;
-    if (!m[4] && !m[8] && !Number.isInteger(christmasYear)) return null;
-    const startDay = Number(m[2]);
-    const startMonth = MONTHS[String(m[3] || "").toLowerCase()];
-    const endDay = Number(m[6]);
-    const endMonth = MONTHS[String(m[7] || "").toLowerCase()];
-    if (!Number.isFinite(startDay) || !Number.isFinite(endDay) || startMonth === undefined || endMonth === undefined) {
-      return null;
+  function gardenBlocks(content) {
+    const blocks = [];
+    let text = "";
+    function flush() {
+      if (text.trim()) blocks.push({ text });
+      text = "";
     }
-    const yearOffset = endMonth < startMonth ? 1 : 0;
-    const inferredStartYear = Number.isInteger(christmasYear) ? christmasYear :
-      (m[8] ? Number(m[8]) - yearOffset : new Date().getFullYear());
-    const startYear = m[4] ? Number(m[4]) : inferredStartYear;
-    const endYear = m[8] ? Number(m[8]) : startYear + yearOffset;
-    const start = new Date(startYear, startMonth, startDay);
-    const resume = new Date(endYear, endMonth, endDay);
-    if (start.getMonth() !== startMonth || start.getDate() !== startDay ||
-        resume.getMonth() !== endMonth || resume.getDate() !== endDay || resume <= start) return null;
-    const christmas = new Date(start.getFullYear(), 11, 25);
-    const startOffsetDays = daysBetween(christmas, start);
-    const durationDays = daysBetween(start, resume);
-    return {
-      startOffsetDays,
-      durationDays: durationDays > 0 ? durationDays : 14,
-      sourceChristmasYear: start.getFullYear()
-    };
+    function visit(node) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        text += node.data;
+        return;
+      }
+      if (node.nodeType !== Node.ELEMENT_NODE || node.matches("nav,header,footer,aside,script,style")) return;
+      const heading = /^H([1-6])$/.exec(node.tagName);
+      if (heading) {
+        flush();
+        blocks.push({ text: node.textContent, heading: Number(heading[1]) });
+        return;
+      }
+      const boundary = node.matches("p,li,ul,ol,dl,dt,dd,table,tr,th,td,div,section,article,blockquote,br");
+      if (boundary) flush();
+      for (const child of node.childNodes) visit(child);
+      if (boundary) flush();
+    }
+    visit(content);
+    flush();
+    return blocks;
+  }
+
+  function* gardenNotices(content) {
+    const headings = [];
+    let topic = null;
+    let notice = [];
+    for (const block of gardenBlocks(content)) {
+      const text = normaliseGardenText(block.text);
+      if (block.heading) {
+        if (notice.length) yield notice;
+        notice = [];
+        while (headings.length && headings[headings.length - 1].level >= block.heading) headings.pop();
+        topic = gardenTopic(text) ?? headings[headings.length - 1]?.topic ?? null;
+        headings.push({ level: block.heading, topic });
+        if (topic === "garden") notice.push(text);
+        continue;
+      }
+      for (const raw of text.split(/[!?;]|\.(?=\s|$)/)) {
+        const passage = raw.trim();
+        if (!passage) continue;
+        const nextTopic = gardenTopic(passage);
+        if (nextTopic && nextTopic !== topic) {
+          if (notice.length) yield notice;
+          notice = [];
+          topic = nextTopic;
+        }
+        if (topic === "garden") notice.push(passage);
+      }
+    }
+    if (notice.length) yield notice;
+  }
+
+  const gardenDate = /\b(?:(?:(\d{1,2})(?:st|nd|rd|th)?\s*(?:or|and|[-/&])\s*)?(\d{1,2})(?:st|nd|rd|th)?\s+(Jan(?:uary)?|Dec(?:ember)?)(?:,?\s+(\d{4}))?|(\d{4})-(\d{2})-(\d{2})|(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?)\b(?!\/\d)/gi;
+
+  function* gardenDates(text) {
+    for (const match of text.matchAll(gardenDate)) {
+      const [, sharedDay, day, month, year, isoYear, isoMonth, isoDay, ukDay, ukMonth, ukYear] = match;
+      const monthNumber = month ? (/^dec/i.test(month) ? 12 : 1) : Number(isoMonth || ukMonth);
+      if (monthNumber !== 12 && monthNumber !== 1) continue;
+      const calendarYear = Number(year || isoYear || ukYear) || null;
+      if (sharedDay) yield { month: monthNumber, day: Number(sharedDay), year: calendarYear };
+      yield { month: monthNumber, day: Number(day || isoDay || ukDay), year: calendarYear };
+    }
+  }
+
+  function parseGardenSuspensionRule(content) {
+    const rules = new Map();
+    for (const notice of gardenNotices(content)) {
+      const dates = notice.flatMap((text) => Array.from(gardenDates(text)));
+      const december = dates.filter((date) => date.month === 12);
+      const january = dates.filter((date) => date.month === 1);
+      if (!december.length || !january.length) continue;
+      const starts = new Set(december.map((date) => date.day));
+      const ends = new Set(january.map((date) => date.day));
+      if (starts.size !== 1 || ends.size !== 1) continue;
+      const [start] = starts;
+      const [resume] = ends;
+      const durationDays = 31 - start + resume;
+      if (start < 1 || start > 31 || resume < 1 || resume > 31 || durationDays > 31) continue;
+      const januaryYear = january.find((date) => date.year)?.year;
+      const sourceChristmasYear = december.find((date) => date.year)?.year ??
+        (januaryYear ? januaryYear - 1 : null);
+      const key = `${start}/${resume}`;
+      const previous = rules.get(key);
+      if (!previous || previous.sourceChristmasYear === null) {
+        rules.set(key, { startDay: start, resumeDay: resume, sourceChristmasYear });
+      }
+    }
+    return rules.size === 1 ? rules.values().next().value : null;
   }
 
   function addDays(date, days) {
     const out = new Date(date.getTime());
     out.setDate(out.getDate() + Number(days || 0));
     return out;
-  }
-
-  function daysBetween(a, b) {
-    return Math.round((b.getTime() - a.getTime()) / 86400000);
   }
 
   async function loadIcons(lookup, includeFood = true) {
