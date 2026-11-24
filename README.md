@@ -29,24 +29,24 @@ All efforts have been taken to make the PDF look as much like the original PDF p
 ### Weekly
 <table width="100%">
   <tr>
-    <th width="40%" align="left"><a href="docs/original/RecTueRefTue.pdf">Original</a></th>
-    <th width="60%" align="left"><a href="docs/new/RecTueRefTue-2027.pdf">New (food waste enabled)</a></th>
+    <th width="42.7%" align="left"><a href="docs/original/RecTueRefTue.pdf">Original</a></th>
+    <th width="57.3%" align="left"><a href="docs/new/RecTueRefTue-2027.pdf">New (food waste enabled)</a></th>
   </tr>
   <tr>
-    <td width="40%"><img src="docs/original/RecTueRefTue.png" width="100%"></td>
-    <td width="60%"><img src="docs/new/RecTueRefTue-2027.png" width="100%"></td>
+    <td width="42.7%"><img src="docs/original/RecTueRefTue.png" width="100%"></td>
+    <td width="57.3%"><img src="docs/new/RecTueRefTue-2027.png" width="100%"></td>
   </tr>
 </table>
 
 ### Fortnightly
 <table width="100%">
   <tr>
-    <th width="40%" align="left"><a href="docs/original/RecTueFort1RefTueFort2.pdf">Original</a></th>
-    <th width="60%" align="left"><a href="docs/new/RecTueFort1RefTueFort2-2027.pdf">New (food waste disabled)</a></th>
+    <th width="42.7%" align="left"><a href="docs/original/RecTueFort1RefTueFort2.pdf">Original</a></th>
+    <th width="57.3%" align="left"><a href="docs/new/RecTueFort1RefTueFort2-2027.pdf">New (food waste disabled)</a></th>
   </tr>
   <tr>
-    <td width="40%"><img src="docs/original/RecTueFort1RefTueFort2.png" width="100%"></td>
-    <td width="60%"><img src="docs/new/RecTueFort1RefTueFort2-2027.png" width="100%"></td>
+    <td width="42.7%"><img src="docs/original/RecTueFort1RefTueFort2.png" width="100%"></td>
+    <td width="57.3%"><img src="docs/new/RecTueFort1RefTueFort2-2027.png" width="100%"></td>
   </tr>
 </table>
 
